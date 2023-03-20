@@ -7,6 +7,8 @@
 import os
 import csv
 import pandas as pd
+from tqdm import tqdm
+
 
 base_path = os.path.abspath('.')  # 获得当前工作目录
 father_path = os.path.abspath('..')  # 获得当前工作目录的父目录
@@ -42,7 +44,7 @@ def get_plant_nutrition(files):
     :param files: 文件列表，
     :return: plant2nutrition.csv dict/food.txt
     """
-    plant2nutrition = {}
+    plant2nutrition = {'food': 'nutrition'}
 
     for filename in files:
         with open(filename, encoding='utf8') as csv_file:
@@ -60,10 +62,10 @@ def get_plant_nutrition(files):
     #     print(i)
 
     with open(os.path.join(father_path, 'data/food2nutrition.csv'), 'w', encoding='utf8') as f:
-        [f.write(f'{key},营养成分,{value}\n') for key, value in plant2nutrition.items()]
+        [f.write(f'{key},营养成分,{value}\n') for key, value in tqdm(plant2nutrition.items())]
 
     with open(os.path.join(father_path, 'dict/food.txt'), 'w', encoding='utf8') as f:
-        [f.write(f'{key}\n') for key, value in plant2nutrition.items()]
+        [f.write(f'{key}\n') for key, value in tqdm(plant2nutrition.items())]
 
 
 def main():

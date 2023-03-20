@@ -13,13 +13,15 @@ import os
 
 if __name__ == '__main__':
 
+    print("正在对数据进行处理...")
     cw.main()
     pn.main()
-
     father_path = os.path.abspath('..')
     shutil.copy('csv\weather_plant.csv', os.path.join(father_path, 'data'))
-    os.renames(os.path.join(father_path, 'data\weather_plant.csv'),
-               os.path.join(father_path, 'data\weather2plant.csv'))
 
-    build_graph.main()
+    print("\n数据处理完成 \n正在构建知识图谱...")
+
+    build_graph.load()
+
+    print('\n知识图谱构建完成...')
 

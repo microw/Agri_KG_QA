@@ -8,6 +8,7 @@
 import os
 import csv
 import pandas as pd
+from tqdm import tqdm
 
 base_path = os.path.abspath('.')  # 获得当前工作目录
 father_path = os.path.abspath('..')  # 获得当前工作目录的父目录
@@ -37,12 +38,12 @@ def get_city(files):
 
 def get_city_weather(files):
     """
-    获取三元组《city，气候，weather_》;
+    获取三元组《city，气候，weather》;
     获得city字典
     :param files: 文件列表，
-    :return: city2weather_.csv dict/city.txt
+    :return: city2weather.csv dict/city.txt
     """
-    city2weather = {}
+    city2weather = {'city': 'weather'}
 
     for filename in files:
         with open(filename, encoding='utf8') as csv_file:
@@ -74,11 +75,11 @@ def get_city_weather(files):
 
     # for i in data.items():
     #     print(i)
-    with open(os.path.join(father_path, 'data/city2weather_.csv'), 'w', encoding='utf8') as f:
-        [f.write('{0},气候,{1}\n'.format(key, value)) for key, value in data.items()]
+    with open(os.path.join(father_path, 'data/city2weather.csv'), 'w', encoding='utf8') as f:
+        [f.write('{0},气候,{1}\n'.format(key, value)) for key, value in tqdm(data.items())]
 
     with open(os.path.join(father_path, 'dict/city.txt'), 'w', encoding='utf8') as f:
-        [f.write(f'{key}\n') for key, value in data.items()]
+        [f.write(f'{key}\n') for key, value in tqdm(data.items())]
 
 
 def main():
