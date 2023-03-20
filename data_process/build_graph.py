@@ -40,6 +40,10 @@ def load(f2r):
             graph.create(relation)
 
 
-if __name__ == '__main__':
+def main():
     file2relation = {'city2weather_': '气候', 'food2nutrition': '营养成分', 'weather2plant': '适合种植'}
     load(file2relation)
+
+
+if __name__ == '__main__':
+    main()
