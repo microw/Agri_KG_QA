@@ -16,12 +16,12 @@ class QuestionClassifier:
         cur_dir = os.path.abspath('..')  # 获得当前工作目录的父目录
         # 特征值路径
         self.city_path = os.path.join(cur_dir, 'dict/city.txt')
-        self.plant_path = os.path.join(cur_dir, 'dict/plant.txt')
+        self.plant_path = os.path.join(cur_dir, 'dict/food.txt')
 
         # 加载特征值
         self.city_wds = [i.strip() for i in open(self.city_path, encoding='utf8') if i.strip()]
-        self.plant_wds = [i.strip() for i in open(self.plant_path, encoding='utf8') if i.strip()]
-        self.region_words = set(self.city_wds + self.plant_wds)
+        self.food_wds = [i.strip() for i in open(self.plant_path, encoding='utf8') if i.strip()]
+        self.region_words = set(self.city_wds + self.food_wds)
 
         # 构造领域actree
         self.region_tree = self.build_actree(list(self.region_words))
@@ -30,6 +30,7 @@ class QuestionClassifier:
         # 问句疑问词
         self.city_qwds = ['气候']
         self.plant_qwds = ['营养元素', '营养成分']
+        self.cityplant_qwds = ['适合种植', '可以种植', '应该种植']
 
         print('model init finished ......')
         return
@@ -41,8 +42,11 @@ class QuestionClassifier:
             wd_dict[wd] = []
             if wd in self.city_wds:
                 wd_dict[wd].append('city')
-            if wd in self.plant_wds:
+                wd_dict[wd].append('city2plant')
+            if wd in self.food_wds:
                 wd_dict[wd].append('food')
+            # if wd in self.cityplant_wds:
+
         return wd_dict
 
     # 构造actree，加速过滤
@@ -104,6 +108,11 @@ class QuestionClassifier:
             question_type = 'food'
             question_types.append(question_type)
 
+        # city2plant
+        if self.check_words(self.cityplant_qwds, question) and ('city2plant' in types):
+            question_type = 'city2plant'
+            question_types.append(question_type)
+
         # 将多个分类结果进行合并处理，组装成一个字典
         data['question_types'] = question_types
         return data
@@ -134,6 +143,8 @@ class QuestionPaser:
                 sql = self.sql_transfer(question_type, entity_dict.get('city'))
             elif question_type == 'food':
                 sql = self.sql_transfer(question_type, entity_dict.get('food'))
+            elif question_type == 'city2plant':
+                sql = self.sql_transfer(question_type, entity_dict.get('city2plant'))
 
             if sql:
                 sql_['sql'] = sql
@@ -152,13 +163,18 @@ class QuestionPaser:
         sql = []
         # 查询城市气候
         if question_type == 'city':
-            sql = ["MATCH (m:city)-[relation:气候]->(n:weather_) where m.entity1 = '{0}'" \
-                   " return n.entity2, m.entity1".format(i) for i
-                   in entities]
+            sql = ["MATCH (m:city)-[relation:气候]->(n:weather) where m.city = '{0}'" \
+                   " return n.weather, m.city".format(i) for i in entities]
         # 查询food营养成分
         elif question_type == 'food':
-            sql = ["MATCH (m:food)-[r:营养成分]->(n:nutrition) where m.entity1 = '{0}' return n.entity2, m.entity1".format(i) for i
+            sql = ["MATCH (m:food)-[r:营养元素]->(n:nutrition) where m.food = '{0}' " \
+                   "return n.nutrition, m.food".format(i) for i in entities]
+        # 查询city2plant营养成分
+        elif question_type == 'city2plant':
+            sql = ["MATCH (m:city)-[*2]->(n) where m.city = '{0}'" \
+                   " return n.plant, m.city".format(i) for i
                    in entities]
+        # sql.append()
 
         return sql
 
@@ -171,6 +187,7 @@ class AnswerSearcher:
             user="neo4j",
             password="123456")
         self.num_limit = 20
+
     '''执行cypher查询，并返回相应结果'''
 
     def search_main(self, sqls):
@@ -194,14 +211,21 @@ class AnswerSearcher:
         if not answers:
             return ''
         if question_type == 'city':
-            desc = [i['m.entity1'] for i in answers]
-            subject = answers[0]['n.entity2']
+            desc = [i['m.city'] for i in answers]
+            subject = answers[0]['n.weather']
             final_answer = '{1}的气候类型是：“{0}”'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
 
         elif question_type == 'food':
-            desc = [i['m.entity1'] for i in answers]
-            subject = answers[0]['n.entity2']
+            desc = [i['m.food'] for i in answers]
+            subject = answers[0]['n.nutrition']
             final_answer = '{1}的营养成分包括：“{0}”'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
+        elif question_type == 'city2plant':
+            desc = [i['m.city'] for i in answers]
+            subject = []
+            for i in range(len(answers)):
+                # subject = answers[0]['n.plant']
+                subject.append(answers[i]['n.plant'])
+            final_answer = '{1}适合种植的植物包括：“{0}”'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
         return final_answer
 
 
@@ -220,7 +244,7 @@ class ChatBotGraph:
         res_sql = self.parser.parser_main(res_classify)
         # print(f'res_sql:{res_sql}')
         final_answers = self.searcher.search_main(res_sql)
-        # print(f'final_answers: {final_answer}')
+        # print(f'final_answers: {final_answers}')
 
         if not final_answers:
             return answer
@@ -245,6 +269,8 @@ class ChatBotGraph:
 if __name__ == '__main__':
     handler = ChatBotGraph()
     question = '伦敦的气候？'
+    # question = '日照市适合种植什么植物'
     # question = '豆腐乳的营养成分？'
+
     data = handler.chat_main(question)
     print(data)
