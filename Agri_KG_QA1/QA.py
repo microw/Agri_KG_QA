@@ -9,19 +9,23 @@
 import os
 import ahocorasick
 from py2neo import Graph, Node, Relationship
+from django.shortcuts import render
 
 
 class QuestionClassifier:
     def __init__(self):
+        # cur_dir = os.path.abspath('.')  # 获得当前工作目录的父目录
         cur_dir = os.path.abspath('..')  # 获得当前工作目录的父目录
         # 特征值路径
         self.city_path = os.path.join(cur_dir, 'dict/city.txt')
-        self.plant_path = os.path.join(cur_dir, 'dict/food.txt')
+        self.food_path = os.path.join(cur_dir, 'dict/food.txt')
+        self.plant_path = os.path.join(cur_dir, 'dict/plant.txt')
 
         # 加载特征值
         self.city_wds = [i.strip() for i in open(self.city_path, encoding='utf8') if i.strip()]
-        self.food_wds = [i.strip() for i in open(self.plant_path, encoding='utf8') if i.strip()]
-        self.region_words = set(self.city_wds + self.food_wds)
+        self.food_wds = [i.strip() for i in open(self.food_path, encoding='utf8') if i.strip()]
+        self.plant_wds = [i.strip() for i in open(self.plant_path, encoding='utf8') if i.strip()]
+        self.region_words = set(self.city_wds + self.food_wds + self.plant_wds)
 
         # 构造领域actree
         self.region_tree = self.build_actree(list(self.region_words))
@@ -29,8 +33,9 @@ class QuestionClassifier:
         self.wdtype_dict = self.build_wdtype_dict()
         # 问句疑问词
         self.city_qwds = ['气候']
-        self.plant_qwds = ['营养元素', '营养成分']
+        self.food_qwds = ['营养元素', '营养成分']
         self.cityplant_qwds = ['适合种植', '可以种植', '应该种植']
+        self.plant_qwds = ['详细信息', '简介', '基本信息', '']
 
         print('model init finished ......')
         return
@@ -45,7 +50,8 @@ class QuestionClassifier:
                 wd_dict[wd].append('city2plant')
             if wd in self.food_wds:
                 wd_dict[wd].append('food')
-            # if wd in self.cityplant_wds:
+            if wd in self.plant_wds:
+                wd_dict[wd].append('plant2detail')
 
         return wd_dict
 
@@ -104,13 +110,18 @@ class QuestionClassifier:
             question_types.append(question_type)
 
         # plant
-        if self.check_words(self.plant_qwds, question) and ('food' in types):
+        if self.check_words(self.food_qwds, question) and ('food' in types):
             question_type = 'food'
             question_types.append(question_type)
 
         # city2plant
         if self.check_words(self.cityplant_qwds, question) and ('city2plant' in types):
             question_type = 'city2plant'
+            question_types.append(question_type)
+
+        # plant2detail
+        if self.check_words(self.plant_qwds, question) and ('plant2detail' in types):
+            question_type = 'plant2detail'
             question_types.append(question_type)
 
         # 将多个分类结果进行合并处理，组装成一个字典
@@ -145,6 +156,8 @@ class QuestionPaser:
                 sql = self.sql_transfer(question_type, entity_dict.get('food'))
             elif question_type == 'city2plant':
                 sql = self.sql_transfer(question_type, entity_dict.get('city2plant'))
+            elif question_type == 'plant2detail':
+                sql = self.sql_transfer(question_type, entity_dict.get('plant2detail'))
 
             if sql:
                 sql_['sql'] = sql
@@ -174,7 +187,10 @@ class QuestionPaser:
             sql = ["MATCH (m:city)-[*2]->(n) where m.city = '{0}'" \
                    " return n.plant, m.city".format(i) for i
                    in entities]
-        # sql.append()
+        # 查询plant2detail
+        elif question_type == 'plant2detail':
+            sql = ["MATCH (m:plant)-[relation:简介]->(n:detail) where m.plant = '{0}'" \
+                   " return n.detail, m.plant".format(i) for i in entities]
 
         return sql
 
@@ -213,19 +229,23 @@ class AnswerSearcher:
         if question_type == 'city':
             desc = [i['m.city'] for i in answers]
             subject = answers[0]['n.weather']
-            final_answer = '{1}的气候类型是：“{0}”'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
+            final_answer = '{1}的气候类型是：{0}'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
 
         elif question_type == 'food':
             desc = [i['m.food'] for i in answers]
             subject = answers[0]['n.nutrition']
-            final_answer = '{1}的营养成分包括：“{0}”'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
+            final_answer = '{1}的营养成分包括：{0}'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
         elif question_type == 'city2plant':
             desc = [i['m.city'] for i in answers]
             subject = []
             for i in range(len(answers)):
                 # subject = answers[0]['n.plant']
                 subject.append(answers[i]['n.plant'])
-            final_answer = '{1}适合种植的植物包括：“{0}”'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
+            final_answer = '{1}适合种植的植物包括：{0}'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
+        elif question_type == 'plant2detail':
+            desc = [i['m.plant'] for i in answers]
+            subject = answers[0]['n.detail']
+            final_answer = '{1}的基本介绍：{0}'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
         return final_answer
 
 
@@ -238,13 +258,13 @@ class ChatBotGraph:
     def chat_main(self, sent):
         answer = '您好，我是智能助理，希望可以帮到您。如果没答上来，祝您身体棒棒！'
         res_classify = self.classifier.classify(sent)
-        # print(f'res_classify: {res_classify}')
+        print(f'res_classify: {res_classify}')
         if not res_classify:
             return answer
         res_sql = self.parser.parser_main(res_classify)
-        # print(f'res_sql:{res_sql}')
+        print(f'res_sql:{res_sql}')
         final_answers = self.searcher.search_main(res_sql)
-        # print(f'final_answers: {final_answers}')
+        print(f'final_answers: {final_answers}')
 
         if not final_answers:
             return answer
@@ -252,25 +272,32 @@ class ChatBotGraph:
             return '\n'.join(final_answers)
 
 
-# def question_answering(request):  # index页面需要一开始就加载的内容写在这里
-#     context = {'ctx': ''}
-#     if request.GET:
-#         question = request.GET['question']
-#     handler = ChatBotGraph()
-#     # question = input('input an question:')
-#     q = question
-#     data = handler.chat_main(q)
-#     print(data)
-#     context = {'ctx': data}
-#
-#     return render(request, 'question_answering.html', context)
+def question_answering(request):  # index页面需要一开始就加载的内容写在这里
+    context = {'ctx': ''}
+    if request.GET:
+        question = request.GET['question']
+        handler = ChatBotGraph()
+        # question = input('input an question:')
+        d = handler.chat_main(question)
+        # print(type(data))
+        data = [d]
+        ret_dict = {'answer': data}
+        print(ret_dict)
+        # context = {'ctx': data}
+        if len(ret_dict) != 0 and ret_dict != 0:
+            return render(request, 'question_answering.html', {'ret': ret_dict})
+        print(context)
+        return render(request, 'question_answering.html', {'ctx': '暂未找到答案'})
+    return render(request, 'question_answering.html', context)
 
 
 if __name__ == '__main__':
     handler = ChatBotGraph()
-    question = '伦敦的气候？'
-    # question = '日照市适合种植什么植物'
+    # question = '伦敦的气候？'
+    question = '崇明县适合种植什么？'
     # question = '豆腐乳的营养成分？'
+    # question = '茄子的基本信息？'
+    # question = '植物'
 
     data = handler.chat_main(question)
     print(data)
