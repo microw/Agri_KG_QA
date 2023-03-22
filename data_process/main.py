@@ -7,7 +7,8 @@
 
 import build_graph
 import data_process.data_city2weather as cw
-import data_process.data_plant2nutrition as pn
+import data_process.data_food2nutrition as pn
+import data_process.data_plant2klg as pk
 import shutil
 import os
 
@@ -16,6 +17,7 @@ if __name__ == '__main__':
     print("正在对数据进行处理...")
     cw.main()
     pn.main()
+    pk.main()
     father_path = os.path.abspath('..')
     shutil.copy('csv\weather_plant.csv', os.path.join(father_path, 'data'))
 

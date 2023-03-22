@@ -65,6 +65,22 @@ def load():
         relation = Relationship(node1, f'适合种植', node2)
         graph.create(relation)
 
+    # 导入plant2detail.csv
+    with open(os.path.join(father_path, 'data/plant2detail.csv'), 'r', encoding='utf8') as f:
+        reader = csv.reader(f)
+        data = list(reader)
+    # print(data[1])  # ['果蔬汁', '营养成分', '维生素']
+    print('\n正在加载plant2detail...')
+    for i in tqdm(range(1, len(data))):
+        node1 = graph.nodes.match(f'plant', plant=data[i][0]).first()
+        node2 = Node(f'detail', detail=data[i][2])
+
+        graph.create(node2)
+        if node1 is None:
+            node1 = Node(f'plant', plant=data[i][0])
+        relation = Relationship(node1, f'简介', node2)
+        graph.create(relation)
+
 
 if __name__ == '__main__':
     load()

@@ -34,7 +34,7 @@ def get_nutrition(files):
     name = ["title", "url", "image", "openTypeList", "detail", "baseInfoKeyList", "baseInfoValueList"]
     test = pd.DataFrame(columns=name, data=data)
     # print(test)
-    test.to_csv(os.path.join(father_path, f'data/nutrition.csv'), encoding='utf8', index=False)
+    test.to_csv(os.path.join(base_path, f'nutrition.csv'), encoding='utf8', index=False)
 
 
 def get_plant_nutrition(files):
@@ -73,7 +73,7 @@ def main():
                     os.path.join(base_path, 'csv/hudong_pedia2.csv')]  # 实体
     get_nutrition(entity_file1)
 
-    entity_file2 = [os.path.join(father_path, 'data/nutrition.csv')]
+    entity_file2 = [os.path.join(base_path, 'nutrition.csv')]
     get_plant_nutrition(entity_file2)
 
 
