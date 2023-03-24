@@ -14,8 +14,8 @@ from django.shortcuts import render
 
 class QuestionClassifier:
     def __init__(self):
-        # cur_dir = os.path.abspath('.')  # 获得当前工作目录的父目录
-        cur_dir = os.path.abspath('..')  # 获得当前工作目录的父目录
+        cur_dir = os.path.abspath('.')  # 获得当前工作目录
+        # cur_dir = os.path.abspath('..')  # 获得当前工作目录的父目录
         # 特征值路径
         self.city_path = os.path.join(cur_dir, 'dict/city.txt')
         self.food_path = os.path.join(cur_dir, 'dict/food.txt')
@@ -32,9 +32,9 @@ class QuestionClassifier:
         # 构造词典
         self.wdtype_dict = self.build_wdtype_dict()
         # 问句疑问词
-        self.city_qwds = ['气候']
+        self.city_qwds = ['气候', '天气']
         self.food_qwds = ['营养元素', '营养成分']
-        self.cityplant_qwds = ['适合种植', '可以种植', '应该种植']
+        self.cityplant_qwds = ['适合种植', '适合种', '可以种植', '可以种', '应该种',  '适合种', '']
         self.plant_qwds = ['详细信息', '简介', '基本信息', '']
 
         print('model init finished ......')
@@ -294,7 +294,7 @@ def question_answering(request):  # index页面需要一开始就加载的内容
 if __name__ == '__main__':
     handler = ChatBotGraph()
     # question = '伦敦的气候？'
-    question = '崇明县适合种植什么？'
+    question = '日照市适合种植什么？'
     # question = '豆腐乳的营养成分？'
     # question = '茄子的基本信息？'
     # question = '植物'
