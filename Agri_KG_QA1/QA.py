@@ -14,8 +14,8 @@ from django.shortcuts import render
 
 class QuestionClassifier:
     def __init__(self):
-        cur_dir = os.path.abspath('.')  # 获得当前工作目录
-        # cur_dir = os.path.abspath('..')  # 获得当前工作目录的父目录
+        cur_dir = os.path.abspath('.')  # 获得当前工作目录      (django run)
+        # cur_dir = os.path.abspath('..')  # 获得当前工作目录的父目录   (local run)
         # 特征值路径
         self.city_path = os.path.join(cur_dir, 'dict/city.txt')
         self.food_path = os.path.join(cur_dir, 'dict/food.txt')
@@ -34,8 +34,8 @@ class QuestionClassifier:
         # 问句疑问词
         self.city_qwds = ['气候', '天气']
         self.food_qwds = ['营养元素', '营养成分']
-        self.cityplant_qwds = ['适合种植', '适合种', '可以种植', '可以种', '应该种',  '适合种']
-        self.plant_qwds = ['详细信息', '简介', '基本信息']
+        self.cityplant_qwds = ['适合种植', '适合种', '可以种植', '可以种', '应该种', '适合种']
+        self.plant_qwds = ['详细信息', '简介', '基本信息', '知识']
 
         print('model init finished ......')
         return
@@ -207,7 +207,7 @@ class AnswerSearcher:
     '''执行cypher查询，并返回相应结果'''
 
     def search_main(self, sqls):
-        final_answers = []
+        final_answers = {}
         for sql_ in sqls:
             question_type = sql_['question_type']
             queries = sql_['sql']
@@ -215,31 +215,35 @@ class AnswerSearcher:
             for query in queries:
                 ress = self.g.run(query).data()
                 answers += ress
+                print(f'answers{answers}')
             final_answer = self.answer_prettify(question_type, answers)
+            print(f'final_answer{final_answer}')
             if final_answer:
-                final_answers.append(final_answer)
+                final_answers = dict(final_answer, **final_answers)
         return final_answers
 
     '''根据对应的qustion_type，调用相应的回复模板'''
 
     def answer_prettify(self, question_type, answers):
-        final_answer = {'answer': []}
-        # print(f'answers:{answers}')
+        final_answer = {'answer': [], 'list': []}
+        # final_answer['answer'] = ''.join(final_answer['answer'])
+        # print(f'final_a{final_answer}')
+        print(f'answers:{answers}')
         if not answers:
             return ''
         if question_type == 'city':
             desc = [i['m.city'] for i in answers]
             subject = answers[0]['n.weather']
-            final_answer['answer'] = '{1}的气候类型是：{0}'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
-            final_answer['entity1'] = {'city': list(set(desc))}
-            final_answer['entity2'] = {'weather': subject}
+            final_answer['answer'] = subject.split('asdfghjk')
+            final_answer['list'].append({'entity1': list(set(desc)), 'rel': '气候类型', 'entity2': subject,
+                                         'entity1_type': 'city', 'entity2_type': 'weather'})
 
         elif question_type == 'food':
             desc = [i['m.food'] for i in answers]
             subject = answers[0]['n.nutrition']
-            final_answer['answer'] = '{1}的营养成分包括：{0}'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
-            final_answer['entity1'] = {'entity1_type': 'food', 'value': list(set(desc))}
-            final_answer['entity2'] = {'entity2_type': 'nutrition', 'value': subject}
+            final_answer['answer'] = subject.split('asdfghjk')
+            final_answer['list'].append({'entity1': list(set(desc)), 'rel': '营养成分', 'entity2': subject,
+                                         'entity1_type': 'food', 'entity2_type': 'nutrition'})
         elif question_type == 'city2plant':
             desc = [i['m.city'] for i in answers]
             # print(f'desc:{desc}')
@@ -249,14 +253,14 @@ class AnswerSearcher:
                 subject.append(answers[i]['n.plant'])
             # final_answer['answer'] = '{1}适合种植的植物包括：{0}'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
             final_answer['answer'] = subject
-            final_answer['list'] = {'entity1': list(set(desc)), 'rel': '适合种植', 'entity2': subject,
-                                    'entity1_type': 'city', 'entity2_type': 'plant'}
+            final_answer['list'].append({'entity1': list(set(desc)), 'rel': '适合种植', 'entity2': subject,
+                                         'entity1_type': 'city', 'entity2_type': 'plant'})
         elif question_type == 'plant2detail':
             desc = [i['m.plant'] for i in answers]
             subject = answers[0]['n.detail']
-            final_answer['answer'] = '{1}的基本介绍：{0}'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
-            final_answer['entity1'] = {'plant': list(set(desc))}
-            final_answer['entity2'] = {'detail': subject}
+            final_answer['answer'] = subject.split('asdfghjk')
+            final_answer['list'].append({'entity1': list(set(desc)), 'rel': '基本知识', 'entity2': subject,
+                                         'entity1_type': 'plant', 'entity2_type': 'detail'})
         return final_answer
 
 
@@ -275,6 +279,7 @@ class ChatBotGraph:
         res_sql = self.parser.parser_main(res_classify)
         print(f'res_sql:{res_sql}')
         final_answers = self.searcher.search_main(res_sql)
+        # print(type(final_answers))
         print(f'final_answers: {final_answers}')
 
         if not final_answers:
@@ -289,11 +294,10 @@ def question_answering(request):  # index页面需要一开始就加载的内容
         question = request.GET['question']
         handler = ChatBotGraph()
         ret_dict = handler.chat_main(question)
-        # print(ret_dict)
         # context = {'ctx': data}
         if len(ret_dict) != 0 and ret_dict != 0:
             return render(request, 'question_answering.html', {'ret': ret_dict})
-        print(context)
+        # print(context)
         return render(request, 'question_answering.html', {'ctx': '暂未找到答案'})
     return render(request, 'question_answering.html', context)
 
