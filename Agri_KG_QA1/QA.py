@@ -34,8 +34,8 @@ class QuestionClassifier:
         # 问句疑问词
         self.city_qwds = ['气候', '天气']
         self.food_qwds = ['营养元素', '营养成分']
-        self.cityplant_qwds = ['适合种植', '适合种', '可以种植', '可以种', '应该种',  '适合种', '']
-        self.plant_qwds = ['详细信息', '简介', '基本信息', '']
+        self.cityplant_qwds = ['适合种植', '适合种', '可以种植', '可以种', '应该种',  '适合种']
+        self.plant_qwds = ['详细信息', '简介', '基本信息']
 
         print('model init finished ......')
         return
@@ -223,29 +223,40 @@ class AnswerSearcher:
     '''根据对应的qustion_type，调用相应的回复模板'''
 
     def answer_prettify(self, question_type, answers):
-        final_answer = []
+        final_answer = {'answer': []}
+        # print(f'answers:{answers}')
         if not answers:
             return ''
         if question_type == 'city':
             desc = [i['m.city'] for i in answers]
             subject = answers[0]['n.weather']
-            final_answer = '{1}的气候类型是：{0}'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
+            final_answer['answer'] = '{1}的气候类型是：{0}'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
+            final_answer['entity1'] = {'city': list(set(desc))}
+            final_answer['entity2'] = {'weather': subject}
 
         elif question_type == 'food':
             desc = [i['m.food'] for i in answers]
             subject = answers[0]['n.nutrition']
-            final_answer = '{1}的营养成分包括：{0}'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
+            final_answer['answer'] = '{1}的营养成分包括：{0}'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
+            final_answer['entity1'] = {'entity1_type': 'food', 'value': list(set(desc))}
+            final_answer['entity2'] = {'entity2_type': 'nutrition', 'value': subject}
         elif question_type == 'city2plant':
             desc = [i['m.city'] for i in answers]
+            # print(f'desc:{desc}')
             subject = []
             for i in range(len(answers)):
                 # subject = answers[0]['n.plant']
                 subject.append(answers[i]['n.plant'])
-            final_answer = '{1}适合种植的植物包括：{0}'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
+            # final_answer['answer'] = '{1}适合种植的植物包括：{0}'.format(subject, '；'.join(list(set(desc))[:self.num_limit]))
+            final_answer['answer'] = subject
+            final_answer['list'] = {'entity1': list(set(desc)), 'rel': '适合种植', 'entity2': subject,
+                                    'entity1_type': 'city', 'entity2_type': 'plant'}
         elif question_type == 'plant2detail':
             desc = [i['m.plant'] for i in answers]
             subject = answers[0]['n.detail']
-            final_answer = '{1}的基本介绍：{0}'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
+            final_answer['answer'] = '{1}的基本介绍：{0}'.format(subject, ''.join(list(set(desc))[:self.num_limit]))
+            final_answer['entity1'] = {'plant': list(set(desc))}
+            final_answer['entity2'] = {'detail': subject}
         return final_answer
 
 
@@ -269,7 +280,7 @@ class ChatBotGraph:
         if not final_answers:
             return answer
         else:
-            return '\n'.join(final_answers)
+            return final_answers
 
 
 def question_answering(request):  # index页面需要一开始就加载的内容写在这里
@@ -277,12 +288,8 @@ def question_answering(request):  # index页面需要一开始就加载的内容
     if request.GET:
         question = request.GET['question']
         handler = ChatBotGraph()
-        # question = input('input an question:')
-        d = handler.chat_main(question)
-        # print(type(data))
-        data = [d]
-        ret_dict = {'answer': data}
-        print(ret_dict)
+        ret_dict = handler.chat_main(question)
+        # print(ret_dict)
         # context = {'ctx': data}
         if len(ret_dict) != 0 and ret_dict != 0:
             return render(request, 'question_answering.html', {'ret': ret_dict})
@@ -293,7 +300,7 @@ def question_answering(request):  # index页面需要一开始就加载的内容
 
 if __name__ == '__main__':
     handler = ChatBotGraph()
-    # question = '伦敦的气候？'
+    # question = '伦敦市的气候？'
     question = '日照市适合种植什么？'
     # question = '豆腐乳的营养成分？'
     # question = '茄子的基本信息？'
